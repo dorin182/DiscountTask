@@ -1,0 +1,130 @@
+﻿@page "/"
+@using DiscountTask.Services.Interfaces
+@using DiscountTask.Services.Models
+@inject IDiscountService discountService
+
+<PageTitle>Home</PageTitle>
+
+<div class="row">
+	<div class="col-4">
+		<h2>Generate Discount Codes</h2>
+		<div class="form-group">
+			<label for="discount">Discount Amount</label>
+			<input type="text" class="form-control" id="count" placeholder="Enter discount Amount" @bind="count">
+		</div>
+		<div class="form-group">
+			<label for="discount">Discount Code Length</label>
+			<input type="text" class="form-control" id="length" placeholder="Enter discount code length" @bind="length">
+		</div>
+		<div class="form-group">
+			<button class="btn btn-primary" @onclick="GenerateAsync">Generate</button>
+		</div>
+	</div>
+</div>
+
+@if (generateResponse != null)
+{
+	<div class="alert alert-success" role="alert">
+		Response: @(generateResponse.Result ? "Success" : "Failed")
+	</div>
+}
+
+@if (useCodeResponse != null)
+{
+	<div class="alert alert-success" role="alert">
+		Response: @(useCodeResponse.Result ? "Success" : "Failed")
+	</div>
+}
+
+@if (discountCodes == null)
+{
+	<p><em>Loading...</em></p>
+}
+else
+{
+	<table class="table">
+		<thead>
+			<tr>
+				<th>Code</th>
+				<th>Is Used</th>
+				<th>Action</th>
+			</tr>
+		</thead>
+		<tbody>
+			@foreach (var discountCode in discountCodes)
+			{
+				<tr>
+					<td>@discountCode.Code</td>
+					<td>@(discountCode.IsUsed ? "Yes" : "No")</td>
+					<td>
+						@if (!discountCode.IsUsed)
+						{
+							<button class="btn btn-success" @onclick="() => UseCodeAsync(discountCode.Code)">Activate</button>
+						}
+					</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+}
+
+@code {
+	private ushort count = 10;
+
+	private byte length = 8;
+
+	private GenerateResponse generateResponse;
+
+	private UseCodeResponse useCodeResponse;
+
+	private IEnumerable<DiscountCodeModel> discountCodes;
+
+	private async Task GenerateAsync()
+	{
+		generateResponse = null;
+		generateResponse = await discountService.GenerateDiscountCodesAsync(new GenerateRequest
+			{
+				Count = count,
+				Length = length
+			});
+
+		await Task.WhenAll(
+			CleanResponseAsync(),
+			LoadDataAsync()
+		);
+	}
+
+	private async Task UseCodeAsync(string code)
+	{
+		useCodeResponse = null;
+		useCodeResponse = await discountService.UseDiscountCodeAsync(new UseCodeRequest { Code = code });
+
+		await Task.WhenAll(
+			CleanResponseAsync(),
+			LoadDataAsync()
+		);
+	}
+
+	private async Task CleanResponseAsync()
+	{
+		await Task.Delay(TimeSpan.FromSeconds(2));
+
+		generateResponse = null;
+		useCodeResponse = null;
+	}
+
+	protected override Task OnInitializedAsync()
+	{
+		return LoadDataAsync();
+	}
+
+	private async Task LoadDataAsync()
+	{
+		discountCodes = null;
+
+		discountCodes = await discountService.GetDiscountCodesAsync();
+
+		if (discountCodes == null)
+			discountCodes = Enumerable.Empty<DiscountCodeModel>();
+	}
+}
